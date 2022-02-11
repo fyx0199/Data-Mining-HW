@@ -1,0 +1,452 @@
+---
+title: "ECO395 HW1_Yuxin Feng_Jiyou Chen_Liming Pang"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<br>
+<br>
+<br>
+
+# Question1 - Flights at ABIA
+
+<br>
+
+#### <font color = darkslateblue>Library several packages we will need.</font>
+
+<br>
+
+```{r}
+library(tidyverse)
+library(mosaic)
+library(ggplot2)
+library(data.table)
+library(rsample)
+library(caret)
+library(modelr)
+library(parallel)
+library(foreach)
+```
+
+<br>
+
+### Question a: What's the best time of year to fly to minimize delays?
+
+<br>
+
+```{r}
+ABIA = read.csv("https://raw.githubusercontent.com/jgscott/ECO395M/master/data/ABIA.csv")
+# What is the best time of day to fly to minimize delays? 
+ABIA %>%
+  summarize(mean_DepDelay = mean(DepDelay))
+ABIA %>% 
+  summarize(favstats(DepDelay))
+ABIA %>%
+  summarize(mean_DepDelay = mean(DepDelay, na.rm=TRUE))
+
+by_monthly_uniquecarrier = ABIA %>% 
+  group_by(Month, UniqueCarrier) %>% 
+  summarize(count = n(),
+            mean_DepDelay = mean(DepDelay, na.rm=TRUE))
+```
+
+
+```{r}
+by_monthly_uniquecarrier
+ggplot(by_monthly_uniquecarrier) + geom_col(aes(x=factor(Month), y=mean_DepDelay))
+```
+
+<br>
+
+#### <font color = darkslateblue>Answer:</font>
+#### <font color = darkslateblue>The chart below shows that December is the worst time to fly since the highest mean-delay.</font>
+
+<br>
+ 
+<br>
+
+### Question b: Does the best time to fly to min delays change by destination?
+
+<br>
+
+```{r}
+ggplot(by_monthly_uniquecarrier) + 
+  geom_col(aes(x=factor(Month), y=mean_DepDelay)) + 
+  facet_wrap(~UniqueCarrier)
+```
+
+<br>
+
+#### <font color = darkslateblue>Answer:</font>
+#### <font color = darkslateblue>Yes. Different airlines have different situation (shown in the last table). Take AA as example, the worst month is June apparently.</font>
+<br>
+
+```{r}
+by_monthly_uniquecarrier %>% 
+  group_by(UniqueCarrier) %>%
+  slice_max(order_by = mean_DepDelay, n=1)
+```
+<br>
+<br>
+<br>
+<br>
+
+# Question2 - Wrangling the Billboard Top100
+<br>
+
+## Part A
+
+<br>
+
+### Top 10 songs since 1958
+
+<br>
+
+```{r}
+billboard <- read.csv("https://raw.githubusercontent.com/jgscott/ECO395M/master/data/billboard.csv", row.names=1)
+billboard_select = select(billboard, performer, song)
+bb = count(billboard_select, performer, song) %>% arrange(desc(n))
+colnames(bb) = c("performer", "song", "count")
+billboard_top10 = bb[1:10,]
+
+setDT(billboard_top10)
+print (billboard_top10)
+knitr::kable(billboard_top10,
+             caption = "This is the top 10 songs since 1958 on Billboard!")
+
+```
+
+<br>
+
+## Part B
+
+<br>
+
+### Musical Diversity Trend
+
+<br>
+
+```{r}
+
+billboard_select2 = select(billboard, song_id, year)
+bb_diversity_unorganized1 = distinct(billboard_select2, song_id, year) %>% 
+  arrange(year)
+bb_diversity_unorganized2 = count(bb_diversity_unorganized1, year)
+colnames(bb_diversity_unorganized2) = c("year","numbers")
+n = nrow(bb_diversity_unorganized2)
+billboard_diversity_by_year = bb_diversity_unorganized2[2:n-1,]
+
+bbpicture = ggplot(data = billboard_diversity_by_year) + 
+  geom_point(aes(x = year, y = numbers)) +
+  geom_line(aes(x = year, y = numbers), size = 0.5, color = "Orange")
+bbpicture + xlab("year(1589-2020)") + 
+  ylab("Musical Diversity") +
+  ggtitle("Billboard Musical Diversity Changes by year")
+
+```
+
+<br>
+
+#### <font color = darkslateblue> Conclusion:</font>
+#### <font color = darkslateblue> Once Billboard was introduced to the public, the diversity of music goes up very quickly until reached the peak in the 1960s, then it starts to go down for a long time and reached the lowest point around the start of the 2020s. After that, it appeared to go up again.</font>
+
+<br>
+
+## Part C
+
+<br>
+
+### Nineteen Artists with over 30 "ten-week-hit" songs
+
+<br>
+
+```{r}
+
+ten_week_hit = bb <- filter(bb, bb$count >= 10) %>% arrange(performer)
+new_list = count(ten_week_hit, performer) %>% arrange(desc(n))
+excellent_artists  = new_list[1:19,]
+
+singer_pic = ggplot(data = excellent_artists, 
+                    mapping = aes(x = performer, y = n, fill = performer))
+singer_pic + geom_col() +
+  xlab("Singers with 30+ 'Ten-Week-Hit' Songs") + 
+  ylab("Number of Songs on Billboard for over 10 weeks") +
+  ggtitle("Legendary Artists in Billboard History") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+```
+
+<br>
+<br>
+<br>
+<br>
+
+# Question3 - Wrangling the Olympics
+
+<br>
+
+## Part A
+
+<br>
+
+### 95 Percentile of Heignts for Female Competitors
+
+<br>
+
+```{r}
+olympics_top20 = read.csv("https://raw.githubusercontent.com/jgscott/ECO395M/master/data/olympics_top20.csv")
+olympics_top20_Female = olympics_top20 %>% 
+  filter(sex == "F")
+head(olympics_top20_Female)
+olympics_top20_Female %>% summarize(q95_height = quantile(height, 0.95)) %>% round(3)
+
+```
+
+<br>
+
+#### <font color = darkslateblue> Female Competitor's 95 percentile height is 186.</font>
+
+<br>
+
+## Part B
+
+<br>
+
+### Women's Event with the Greatest Variability in Competitor's Height
+
+<br>
+
+```{r}
+
+olympics_top20_Female %>%
+  group_by(event) %>%
+  summarize(sd_height = sd(height)) %>% summarize(event=event[which.max(sd_height)],max_sd=max(sd_height, na.rm = TRUE))
+
+```
+
+<br>
+
+#### <font color = darkslateblue> “Rowing Women's Coxed Fours” has the greatest women height variability.</font>
+
+<br>
+
+## Part C
+
+<br>
+
+### Average Age of Olympic Swimmers Trend
+
+<br>
+
+```{r}
+
+olympics_top20_swimmers = olympics_top20 %>% 
+  filter(sport == "Swimming")
+
+
+df_m_c <- data.frame(olympics_top20 %>% 
+                       filter(sport == "Swimming", sex == "M" ) %>%
+                       group_by(year) %>%
+                       summarize(avg_age = mean(age, na.rm = TRUE)) %>%
+                       round(3))
+
+
+df_f_c <- data.frame(olympics_top20 %>%
+                       filter(sport == "Swimming", sex == "F" ) %>%
+                       group_by(year) %>%
+                       summarize(avg_age = mean(age, na.rm = TRUE)) %>%
+                       round(3))
+
+
+df_all <- olympics_top20 %>% select(sex, age, year, sport) %>%
+                      filter(sport == "Swimming") %>% 
+                      group_by(year, sex) %>%
+                      summarize(avg_age = mean(age, na.rm = TRUE))
+
+
+ggplot(NULL,aes(year, avg_age)) +
+  geom_line(data = df_m_c, col = "red") +
+  geom_line(data = df_f_c, col = "blue") + labs(x = "Years", y = "Age", title = "Trend of Swimmers")
+```
+
+<br>
+
+#### <font color = darkslateblue> Concllusion: The trend bewteen male and female competitors is different. Female competitor's ages are usually bigger than male's. Both average ages began to increase gradually since 1950.</font>
+
+<br>
+<br>
+<br>
+<br>
+
+# Question4 - k-Nearest Neighbors
+
+<br>
+
+### Predictive Model
+
+<br>
+
+```{r}
+
+sclass = read.csv("https://raw.githubusercontent.com/jgscott/ECO395M/master/data/sclass.csv")
+sclass_350 = sclass %>% 
+  filter(trim == "350") %>% select("mileage", "price")
+
+sclass_65 = sclass %>% 
+  filter(trim == "65 AMG") %>% select("mileage", "price")
+
+sclass_350_split =  initial_split(sclass_350, prop=0.8)
+sclass_350_train = training(sclass_350_split)
+sclass_350_test  = testing(sclass_350_split)
+
+sclass_65_split =  initial_split(sclass_65, prop=0.8)
+sclass_65_train = training(sclass_65_split)
+sclass_65_test  = testing(sclass_65_split)
+
+lm_350 = lm(price ~ mileage, data=sclass_350_train)
+lm_65 = lm(price ~ mileage, data=sclass_65_train)
+
+
+K_folds = 10
+
+sclass_350_folds = crossv_kfold(sclass_350, k=K_folds)
+sclass_65_folds = crossv_kfold(sclass_350, k=K_folds)
+
+
+sclass_350_models = map(sclass_350_folds$train, ~ knnreg(price ~ mileage, k=100, data = ., use.all=FALSE))
+sclass_65_models = map(sclass_65_folds$train, ~ knnreg(price ~ mileage, k=100, data = ., use.all=FALSE))
+
+
+sclass_350_rmse = map2_dbl(sclass_350_models, sclass_350_folds$test, modelr::rmse)
+mean(sclass_350_rmse)
+sclass_65_rmse = map2_dbl(sclass_350_models, sclass_65_folds$test, modelr::rmse)
+mean(sclass_65_rmse)
+
+
+k_grid = c(2, 4, 6, 8, 10, 15, 20, 25, 30, 35, 40, 45,
+           50, 60, 70, 80, 90, 100, 125, 150, 175, 200, 250, 300)
+
+
+sclass_350_grid = foreach(k = k_grid, .combine='rbind') %dopar% {
+  models = map(sclass_350_folds$train, ~ knnreg(price ~ mileage, k=k, data = ., use.all=FALSE))
+  sclass_350_rmse = map2_dbl(models, sclass_350_folds$test, modelr::rmse)
+  c(k=k, err = mean(sclass_350_rmse))
+} %>% as.data.frame
+
+sclass_65_grid = foreach(k = k_grid, .combine='rbind') %dopar% {
+  models = map(sclass_65_folds$train, ~ knnreg(price ~ mileage, k=k, data = ., use.all=FALSE))
+  sclass_65_rmse = map2_dbl(models, sclass_65_folds$test, modelr::rmse)
+  c(k=k, err = mean(sclass_65_rmse))
+} %>% as.data.frame
+
+```
+
+<br>
+
+### 350's AMG
+
+<br>
+
+```{r}
+
+ggplot(sclass_350_grid) + 
+  geom_line(aes(x=k, y=err)) + labs(x = "k", y = "RMSE_350", title = "350") +
+  scale_x_log10()
+
+```
+
+<br>
+
+#### <font color = darkslateblue> From the picture we guess that RMSE_350 reaches its bottom when k is in [10,20].</font>
+
+<br>
+
+### 65's AMG
+
+<br>
+
+```{r}
+
+ggplot(sclass_65_grid) + 
+  geom_line(aes(x=k, y=err)) + labs(x = "k", y = "RMSE_65", title = "65") +
+  scale_x_log10()
+
+```
+
+
+<br>
+
+#### <font color = darkslateblue> From the picture we guess that RMSE_65 reaches its bottom when k is in [10,20].</font>
+
+<br>
+
+### Calculating 350's and 65's AMG optimal k value
+
+<br>
+
+```{r}
+min_k_350 <- sclass_350_grid %>% summarize(k=k[which.min(err)])
+print(min_k_350)
+min_k_65 <- sclass_65_grid %>% 
+  summarize(k=k[which.min(err)])
+print(min_k_65)
+```
+
+<br>
+
+#### <font color = darkslateblue> Optimal k's for 350's and 65's are both 15.</font>
+
+<br>
+
+### sclass_350_test
+
+<br>
+
+```{r}
+
+knn350 = knnreg(price ~ mileage, data=sclass_350_train, k=min_k_350[1,1])
+rmse(knn350, sclass_350_test)
+
+sclass_350_test = sclass_350_test %>%
+  mutate(price_pred = predict(knn350, sclass_350_test))
+
+test_350 = ggplot(data = sclass_350_test) + 
+  geom_point(mapping = aes(x = mileage, y = price), alpha=0.2)
+test_350
+
+test_350 + geom_line(aes(x = mileage, y = price_pred), color='red', size=1.5)
+
+```
+
+<br>
+
+### sclass_65_test
+
+<br>
+
+```{r}
+
+knn65 = knnreg(price ~ mileage, data=sclass_65_train, k=min_k_65[1,1])
+rmse(knn65, sclass_65_test)
+
+sclass_65_test = sclass_65_test %>%
+  mutate(price_pred = predict(knn65, sclass_65_test))
+
+test_65 = ggplot(data = sclass_65_test) + 
+  geom_point(mapping = aes(x = mileage, y = price), alpha=0.2)
+test_65
+
+test_65 + geom_line(aes(x = mileage, y = price_pred), color='blue', size=1.5)
+
+```
+
+<br>
+
+#### <font color = darkslateblue> Two trims yields the same optimal k value. This mignt be because in this kind of situations, not mather the car's trim level changes, k = 15 is always the optimal value for doing KNN. Car's trim level might not be an influential factor .</font>
+
+
+<br>
+<br>
