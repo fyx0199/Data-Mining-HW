@@ -1,0 +1,562 @@
+---
+title: "Final Project - Data Mining"
+author: "Yuxin_Feng, Liming Pang"
+date: "5/9/2022"
+output: pdf_document
+---
+
+# How to be a successful Youtuber?
+<br>
+<br>
+
+# Abstract
+This report analyzes how a new youtuber should upload content to get more subscribers. To analyze this problem, we first cleaned up the source data and then performed regression analysis. After that, the accuracy of KNN and decision tree model is compared. Finally, we analyze the data to make the data visualization. Our results show that for a new youtuber, he or she needs to focus on upload music or entertainment content in order to get a greater number of views.
+<br>
+
+# Introduction
+This project, we use the dataset from the internet, but developed new things and focus on the subject we are interested in. The primary goal of the project is to give some insights for new youtubers to betterly get adapted and decide which area of videos would they invest more in the future.
+The project will be centered around these questions:
+1. what is the current youtube market look like?
+2. Can we get some inference about the views of a video from the information of features we already know and try to predict some values of the videos?
+3. Can we construct a model to forecast the performance of youtube videos?
+4. What types of youtube videos could have relatively high return?
+We would answer all of these questions in the following.
+<br>
+
+# Methods
+1.0 Data Cleaning
+<br>
+We selected the data from March 1, 2018, to June 1, 2018 added counrty as a feature to the dataset.
+<br>
+<br>
+2.0 Regression Analysis
+<br>
+Use variables to predict the views of Youtube Videos. This might help a potential youtuber have a rough idea what elements would influence the ultimate views of the videos. 
+We plan to use regression analysis to find out the whether variables like 'likes', 'dislikes', 'comment_ count', 'category_id', 'dif_date' and 'title_word' will have significant prediction effect on the outcome of views, and try to find the best linear regression model using the step-wise regression method.
+<br>
+<br>
+3.0 KNN & Decision Tress
+<br>
+Performed two models to find out the better one to help us make the decision.
+<br>
+<br>
+4.0 Data analysis
+<br>
+This section mainly consists of three parts. 
+Firstly, we performed analysis on the general data, using plots to tell us the total/average views/likes/dislikes/comments based on different video categories, helping new youtubers to know more about the video market and the potential areas. 
+Secondly, we performed analysis on the top5000 videos in our dataset, picking out some typical characteristic of them to figure out about the audience' tastes on different types of videos. 
+Finally, we analyzed the title of the top5000 videos, separating the words in them to get the top10 words that would appear in hot videos.
+<br>
+<br>
+
+```{r,include=FALSE,echo=FALSE}
+# load the packages we will need for this project
+library(data.table)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(tidytext)
+library(here)
+library(stringr)
+library(tm)
+library(rsample)
+library(tidyverse)
+library(mosaic)
+library(modelr)
+library(corrplot)
+library(caret)
+library(plotly)
+```
+
+# Result
+1.0 Data Cleaning
+<br>
+The first thing we did is data cleaning. The data set we choose is very large. Although the values displayed are relatively complete, we found that in the data collected, the release time of the earliest video in different countries is different. This leads to an incomplete comparison. Therefore, under the condition that the data is absolutely sufficient, we intercepted the data from March 1, 2018, to June 1, 2018. At the same time, we coded each country and added them as a feature to the dataset to better explain the variability. Then we conducted data normalization using formula ((x - mean(x)) / Sd(x)).
+
+<br>
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+path = here()
+date_choose <- function(ca,name,id){
+  country <- c(name)
+  country_id<-c(id)
+  ca <- cbind(ca, country,country_id)
+  ca$publish_time <- str_trunc(ca$publish_time, 10, "right",
+                               ellipsis = "")
+  ca$publish_time <- as.Date(ca$publish_time)
+  ca<-ca[ca$publish_time >= "2018-3-1" & ca$publish_time <= "2018-6-1", ]
+  return (ca)
+}
+ca <- read.csv("~/youtube_data/CAvideos.csv")
+ca<-date_choose(ca,"CA", 1)
+de = read.csv("~/youtube_data/DEvideos.csv")
+de<-date_choose(de,"DE", 2)
+fr = read.csv("~/youtube_data/FRvideos.csv")
+fr<-date_choose(fr,"FR", 3)
+gb = read.csv("~/youtube_data/GBvideos.csv")
+gb<-date_choose(gb,"GB", 4)
+us = read.csv("~/youtube_data/USvideos.csv")
+us<-date_choose(us,"US", 5)
+jp = read.csv("~/youtube_data/JPvideos.csv")
+jp<-date_choose(jp,"JP", 6)
+videos = as.data.table(rbind(ca, de, fr, gb, us, jp))
+
+videos$trending_date <- ydm(videos$trending_date)
+videos$publish_time <- ymd(substr(videos$publish_time,start = 1,stop = 10))
+videos$dif_days <- videos$trending_date-videos$publish_time
+
+category_id = videos$category_id
+views = videos$views
+likes = videos$likes
+dislikes = videos$dislikes
+comment_count = videos$comment_count
+videos$dif_days<-as.numeric(videos$dif_days)
+dif_days = videos$dif_days
+country_id = videos$country_id
+
+z_normalize <- function(x) {
+ return ((x - mean(x)) / sd(x))}
+videos_clean <- videos[,c(5,8:11, 18:19)]
+videos_norm <- lapply(videos_clean, z_normalize)
+videos_norm <- as.data.frame(videos_norm)
+```
+<br>
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+# create a new variable - dif_days
+videos$trending_date = ydm(videos$trending_date)
+videos$publish_time = ymd(substr(videos$publish_time,start = 1,stop = 10))
+videos$dif_days = videos$trending_date-videos$publish_time
+
+# create another new variavle - title_words
+videos$title_words = stringi::stri_count_words(videos$title)
+
+# rename variables
+category_id = videos$category_id
+views = videos$views
+likes = videos$likes
+dislikes = videos$dislikes
+comment_count = videos$comment_count
+dif_days = videos$dif_days
+title_words = videos$title_words
+```
+
+<br>
+2.0 regression analysis
+<br>
+2.0.1 Correlation
+<br>
+We all know that the ultimate goal of a new youtuber is to have the videos popular. That is to say, Views of Videos are the most thing that a youtuber care about. In order to give new youtubers a clearer idea of the relationship between each video features. We first conduct a correlation analysis. 
+We created a matrix that includes 'views’, ‘category_id’, ‘likes’, ‘dislikes’, ‘comment_count’, ‘title_words'. From the outcome, we know that views of videos has strong positive correlation with 'likes'(0.78) and 'dislikes'(0.74), and have a median-level positive correlation with 'comment_count'(0.54).
+<br>
+
+```{r,include=FALSE,echo=FALSE,message=FALSE, warning=FALSE}
+Xmatrix = cbind(views, category_id, likes, dislikes, comment_count, title_words)
+cor(Xmatrix)
+corrplot.mixed(corr = cor(videos[,c("views", "category_id","likes","dislikes","comment_count")]))
+```
+
+2.0.2 pairs regression
+<br>
+We use 'pairs' function to give us a rough idea of the relationships between each variables. The picture shows something obvious to us. For example, 'views' has positive correlation with 'likes', 'dislikes', and 'comment_counts'. 'dif_date' and 'title_words' seem not to be able to explain 'views' well.
+Also, in variables like 'views', 'like', 'dislike', 'comment_count', they seem to have strong correlation with each other from the picture shown to us.
+<br>
+<br>
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+# part1: regression analysis
+# find out the relationship between views and engagement activities of users'
+
+# first of all, let's conduct pair regression to have a general look at the relationship between the varibles
+reg0 = pairs(~views + category_id + likes + dislikes + comment_count + dif_days + title_words, pch=20)
+```
+
+
+2.0.3 linear regression
+<br>
+Based on the research above, we now know that the variables we choose are sure to explain some of the predictor - Video Views. Then we conducted the linear regression. We regress views on 6 variables (category_id, likes, dislikes, comment_count, dif_days,  title_words). We get an adjusted r-square of 0.757, meaning that the variales we choose to predict views might be a good fit. In addition, from the outcome of the regression, four of the six variables we choose have very significant parameter, which means that it makes sense to take them into consideration. The four significant variables are 'likes', 'dislikes', 'comment_count' and 'title_words'.
+
+<br>
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+
+# reg on views
+reg1 = lm(views ~ category_id + likes + dislikes + comment_count + dif_days + title_words, data = videos)
+# summary(reg1)
+# plot(reg1)
+```
+
+
+<br>
+Finding that the parameter of 'dif_date' and 'category_id' is not that obvious, we choose to delete them from the regression function and create a new one using the left four variables. At the same time, we perform the step-wise regression to find out the best model to fit. 
+The result goes to: views ~ likes + dislikes + comment_count + title_words + likes:title_words + comment_count:title_words + likes:dislikes + dislikes:comment_count + dislikes:title_words + likes:comment_count.
+After the step-wise regression, we get a better adjusted r square, which is 0.80, meaning that the present function can be a good model to help us predicting the views using other variables. For a new youtuber, he/she can not only understand which factors may influence the video views, but can each try to estimate the views of a video given some other values.
+<br>
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE, include = FALSE}
+reg2 = lm(views ~ likes + dislikes + comment_count + title_words, data = videos)
+#summary(reg2)
+reg_step1 = step(reg2, scope=~(.)^2)
+summary(reg_step1)
+# plot(reg_step1)
+```
+
+<br>
+3.0 KNN & Decision Tress
+<br>
+3.0.1 KNN
+<br>
+K-Nearest Neighbors algorithm (KNN) is one of the methods we chose. The immediate reason why we chose it is that it is a very simple, inert, nonparametric algorithm. KNN has relatively high accuracy, it does not need to be compared with better supervised learning models, and we do not need to make additional assumptions, adjust multiple parameters, or build models. However, it still has many disadvantages. For example, the accuracy of KNN fluctuates due to the quality of the data. Moreover, for big data, its prediction stage may be very slow. In addition, it will be sensitive to some irrelevant features, so we need to spend more energy on screening features. #### Result - Since the dependent variable is not discrete, we cannot use confusion matrix to show the accuracy of the model, so we calculate the RMSE, MSE and MAE of KNN. When K =5, KNN has the smallest predicted RMSE (0.1540642) (shown in appendix), meanwhile, MSE is 0.02373578 and MAE is 0.4635796.As shown in the figure, the coincidence degree between the real value and the predingvcf  fgcted value is relatively high. Combined with the RMSE shown earlier, this model performs well.
+<br>
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+v_split =  initial_split(videos_norm, prop=0.9)
+v_train = training(v_split)
+v_test  = testing(v_split)
+knn = train(views ~ category_id + likes + dislikes + comment_count + dif_days + country_id, data = v_train, method = "knn")
+pred_y <- predict(knn, v_test)
+plot(knn)
+test_y = v_test$views
+mse = mean((test_y - pred_y)^2)
+mae = caret::MAE(test_y, pred_y)
+rmse = caret::RMSE(test_y, pred_y)
+cat("MSE: ", mse, "MAE: ", mae, " RMSE: ", rmse)
+x = 1:length(test_y)
+plot(x, test_y, col = "red", type = "l", lwd=2,
+     main = "Youtube views data prediction", xlab="Videos", ylab="Test_y(Normalization)")
+lines(x, pred_y, col = "blue", lwd=2)
+legend("topright",  legend = c("original views of predict", "predicted"),
+       fill = c("red", "blue"), col = 2:3,  adj = c(0, 0.6))
+grid()
+```
+<br>
+3.0.2 Decision Tree
+<br>
+We also chose decision tree algorithm for comparison. A decision tree is a graphical way of representing choices and their consequences, and it is a very powerful supervised learning algorithm that can fit complex data sets and make very fast predictions and easily identify important variables and deal with missing data. Decision trees allow us to understand outcomes that convey explicit conditions based on the original variables. Because it doesn't require a lot of computation to process, we can easily program the model, which is a big part of why we chose it. After establishing the decision tree model, we use the cross validation to adjust the decision tree model, specify complexity parameters, adjust length and Gini index to split branches.
+<br>
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+dtree <- train(views ~ category_id + likes + dislikes + comment_count + dif_days + country_id, data = v_train,  method = 'rpart')
+dt_pred <- predict(dtree, v_test)
+
+test_y = v_test$views
+mse = mean((test_y - dt_pred)^2)
+mae = caret::MAE(test_y, dt_pred)
+rmse = caret::RMSE(test_y, dt_pred)
+cat("MSE: ", mse, "MAE: ", mae, " RMSE: ", rmse)
+
+x = 1:length(test_y)
+plot(x, test_y, col = "red", type = "l", lwd=2,
+     main = "Youtube views Decision Tree", xlab="Videos", ylab="Test_y(Normalization)")
+lines(x, dt_pred, col = "blue", lwd=2)
+legend("topright",  legend = c("True value", "Predicted Value"), 
+       fill = c("red", "blue"), col = 2:3,  adj = c(0, 0.6))
+
+```
+<br>
+The RMSE, MSE and MAE of decision tree is 0.6594204, 0.4348353, 0.2191245. They are pretty high so that can prove this model perform bad. Also from the figure, we can know that the superposition of true value and predicted value is not obvious.
+<br>
+<br>
+Decision tree(tuned)
+<br>
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+dtree_grid <- expand.grid(cp = seq(0, 0.001, 0.0001))
+
+dtree_trCtrl <- trainControl(method = 'repeatedcv', number = 10, repeats = 10)
+
+dtree_tune <- train(views ~ category_id + likes + dislikes + comment_count + dif_days + country_id,
+                    data = v_train,  method = 'rpart',
+                    parms = list(split = 'gini'),
+                    trControl = dtree_trCtrl,
+                    tuneGrid = dtree_grid)
+
+test_dtree_tune <- predict(dtree_tune, v_test)
+
+test_y = v_test$views
+mse = mean((test_y - test_dtree_tune)^2)
+mae = caret::MAE(test_y, test_dtree_tune)
+rmse = caret::RMSE(test_y, test_dtree_tune)
+cat("MSE: ", mse, "MAE: ", mae, " RMSE: ", rmse)
+
+x = 1:length(test_y)
+plot(x, test_y, col = "red", type = "l", lwd=2,
+     main = "Youtube views Decision Tree(Tuned)", xlab="Videos", ylab="Test_y(Normalization)")
+lines(x, test_dtree_tune, col = "blue", lwd=2)
+legend("topright",  legend = c("True value", "Predicted Value"), 
+       fill = c("red", "blue"), col = 2:3,  adj = c(0, 0.6))
+```
+<br>
+According to the image, the coincidence degree between the real value and the predicted value is significantly improved, which is a better model.
+<br>
+In general, the performance of KNN is better than the decision tree. Although the accuracy of the decision tree after adjustment is greatly improved, and it is very similar to KNN in terms of the coincidence degree between the real value and the predicted value, the performance of KNN is more outstanding for this data set based on the performance of RMSE, MSE and MAE. As a Youtuber, I would choose to use the KNN model to predict the number of view of  my videos, and gain experience to adjust my content to attract subscriber.
+<br>
+
+
+4.0 Data Visualization
+<br>
+4.0.1 Analysis on a general base
+<br>
+In the first part, we analyze on the general data, using all the video data we have to calculate the total and average value of each variable on the basis of category_id. With this method, we can have a better view of the performance of each type of videos.
+As there are four different pictures generated, I will select a typical one which shows us the average views of each category and put the left three pictures in the appendix section. 
+<br>
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+videos = videos %>% 
+  mutate(category_name=case_when(
+    category_id==1 ~ 'Film and Animation',
+    category_id==2 ~ 'Autos & Vehicles',
+    category_id==10 ~ 'Music',
+    category_id==15 ~ 'Pets & Animals',
+    category_id==17 ~ 'Sports',
+    category_id==19 ~ 'Travel & Events',
+    category_id==20 ~ 'Gaming',
+    category_id==22 ~ 'People & Blogs',
+    category_id==23 ~ 'Comedy',
+    category_id==24 ~ 'Entertainment',
+    category_id==25 ~ 'News & Politics',
+    category_id==26 ~ 'Howto & Style',
+    category_id==27 ~ 'Education',
+    category_id==28 ~ 'Science & Technology',
+    category_id==29 ~ 'Nonprofits & Activism',
+    category_id==30 ~ 'Movies',
+    category_id==43 ~ 'Shows',
+    category_id==44 ~ 'Trailers',
+  ))
+category_name = videos$category_name
+```
+<br>
+
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+sum_videos = videos %>%
+  group_by(category_name) %>%
+  summarise(count=n(), views=sum(views), likes=sum(likes),dislikes=sum(dislikes), comments=sum(comment_count))
+# sum_videos
+```
+<br>
+<br>
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+# ggplot(data=sum_videos, aes(category_name, group=1)) +
+#   geom_line(aes(y=views), color="dark blue") + 
+#   theme(axis.text.x = element_text(angle = 30, hjust = 1), 
+#         plot.title = element_text(hjust = 0.5)) +
+#   xlab('Youtube Video Category') +
+#   ylab("Total Views") +
+#   ggtitle("Total Views by Video Category")
+```
+<br>
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+# ggplot(data=sum_videos, aes(category_name, group=1)) +
+#   geom_line(aes(y=likes, color="likes")) + 
+#   geom_line(aes(y=comments, color="comments")) + 
+#   geom_line(aes(y=dislikes, color="dislikes")) + 
+#   scale_color_manual(values = c(
+#     'likes' = 'steelblue', "comments" = "orange", "dislikes" = "purple")) +
+#   labs(color = 'series') + 
+#   theme(axis.text.x = element_text(angle = 30, hjust = 1), 
+#         plot.title = element_text(hjust = 0.5)) +
+#   xlab('Youtube Video Category') +
+#   ylab("Counts") +
+#   ggtitle("Total Likes, Dislikes & Comments by Video Category")
+```
+<br>
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+average_videos = videos %>%
+  group_by(category_name) %>%
+  summarise(count=n(), views=mean(views), likes=mean(likes),dislikes=mean(dislikes), comments=mean(comment_count))
+```
+<br>
+
+The picture tells us that 'Music' Video has incredibly high average views when compared with other categories. It's more than four times as much as other's average views. Also, 'Film and Animation' and 'Science & Technology' have higher average views than others.
+
+<br>
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+ggplot(data=average_videos, aes(category_name, group=1)) +
+  geom_line(aes(y=views), color="dark blue") + 
+  theme(axis.text.x = element_text(angle = 30, hjust = 1), 
+        plot.title = element_text(hjust = 0.5)) +
+  xlab('Youtube Video Category') +
+  ylab("Average Views") +
+  ggtitle("Average Views by Video Category")
+```
+
+<br>
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+# ggplot(data=average_videos, aes(category_name, group=1)) +
+#   geom_line(aes(y=likes, color="likes")) + 
+#   geom_line(aes(y=comments, color="comments")) + 
+#   geom_line(aes(y=dislikes, color="dislikes")) + 
+#   scale_color_manual(values = c(
+#     'likes' = 'steelblue', "comments" = "orange", "dislikes" = "purple")) +
+#   labs(color = 'series') + 
+#   theme(axis.text.x = element_text(angle = 30, hjust = 1), 
+#         plot.title = element_text(hjust = 0.5)) +
+#   xlab('Youtube Video Category') +
+#   ylab("Counts") +
+#   ggtitle("Average Likes, Dislikes & Comments by Video Category")
+```
+
+<br>
+4.0.2 Analysis on a Top5000 videos
+<br>
+As we have a great number of observations collected, we decided to look more on more popular videos. Trying to figure out the common characteristics of them and make it easier for a new youtuber to get prepared.
+We rank the views of all the video data we get, and select the top5000-viewed videos(top5%).
+We created pie chart to reveal the proportion of each categories' video in the top5000 list.
+In the dimension of views, 'music' is absolutely the top 1 popular video type. 70.6% of the top5000 videos are music related. Also, 'Entertainment' is also a good topic to try with a proportion of 14.7%.
+
+<br>
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+view_count = videos %>% 
+  arrange(desc(views))
+views_5000 = view_count[1:5000,]
+
+plot_ly(views_5000, labels = ~category_name, type = 'pie') %>%
+  layout(title = 'TOP 5000 Views Youtube Videos',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+```
+
+<br>
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+# likes_count = videos %>% 
+#   arrange(desc(likes))
+# likes_5000 = likes_count[1:5000,]
+# plot_ly(likes_5000, labels = ~category_name, type = 'pie') %>%
+#   layout(title = 'TOP 5000 Likes Youtube Videos',
+#          xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+#          yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+```
+
+<br>
+We also did some research on videos that people dislikes. The top2 is just the same as in the list of most viewed videos. 'Music' counts for 58.8% of the top5000 videos that people don't like. 'Entertainment' counts for 18.7%. This is propabably because huge numbers of these types of videos appear on Youtube, they may include good or bad qualities. The sample size is too big for the two category so that the deviation must also be very big.
+<br>
+We hope that the pie chart above would give new youtubers some instinction about which direction they should dive in. As it is always that truth that, there is less competition in the unpopular categories and it may be much easier for new youtuber's to do it well. Choice always counts a lot.
+
+<br>
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+dislikes_count = videos %>% 
+  arrange(desc(dislikes))
+dislikes_5000 = dislikes_count[1:5000,]
+plot_ly(dislikes_5000, labels = ~category_name, type = 'pie') %>%
+  layout(title = 'TOP 5000 Dislikes Youtube Videos',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+```
+
+<br>
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+# cmt_count = videos %>% 
+#   arrange(desc(comment_count))
+# cmt_5000 = cmt_count[1:5000,]
+# plot_ly(cmt_5000, labels = ~category_name, type = 'pie') %>%
+#   layout(title = 'TOP 5000 Comments Youtube Videos',
+#          xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+#          yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+```
+<br>
+
+4.0.3 Text Analysis
+<br>
+In the last part of our analysis, we decided to do some research on the popular videos' title. We want to find out what words appears most frequently.
+The result is shown below, among all the top5000 videos, 'officials' and 'trailer' are the words that appear most. New youtubers may even try to include these words in their videos in order to get more attention from people who are very allergic to some specific keywords.
+<br>
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+docs <- Corpus(VectorSource(views_5000$title))
+#Eliminating unwanted characters
+toSpace <- content_transformer(function (x , pattern ) gsub(pattern, " ", x))
+docs <- tm_map(docs, toSpace, "/")
+docs <- tm_map(docs, toSpace, "@")
+docs <- tm_map(docs, toSpace, "\\|")
+# Converting to lower case
+docs <- tm_map(docs, content_transformer(tolower))
+# Removing numbers
+docs <- tm_map(docs, removeNumbers)
+# Remove english common stopwords
+docs <- tm_map(docs, removeWords, stopwords("english"))
+# Removing the words video and audio
+docs <- tm_map(docs, removeWords, c("video", "audio")) 
+# Removing punctuations
+docs <- tm_map(docs, removePunctuation)
+# Eliminate extra white spaces
+docs <- tm_map(docs, stripWhitespace)
+
+title<- TermDocumentMatrix(docs)
+m.matrix <- as.matrix(title)
+title_sort <- sort(rowSums(m.matrix),decreasing=TRUE)
+views5000_title <- data.frame(word = names(title_sort),freq=title_sort)
+
+options(repr.plot.width = 10, repr.plot.height = 10)
+
+ggplot(views5000_title[1:10,],aes(y = reorder(word,freq),x = freq))+geom_col()+ylab('category')+theme(axis.text.y = element_text(color = "dark blue", size = 20, hjust = .5, vjust = .5, face = "plain"))
+```
+<br>
+
+# Conclusion
+<br>
+The project consists of four sections: data cleaning, regression analysis, knn & decision tree testing and data visualization. We got the opportunity to do some study in youtube videos, and have a look at the youtube video market status from different angles. The four different sections help us better understand the youtube video market. In exploring the topic of 'How to become a succcessful youtuber', we gain some new insights into this area. In conclusion, we know the relationship between each video's features, and create several good models to help us do the forecast work. Also, we use some plot to reveal the trending of present youtube videos, giving new youtubers some inspiration in the future about which direction might be a good choice.
+
+<br>
+<br>
+# Appendix
+```{r,echo=FALSE,message=FALSE, warning=FALSE}
+corrplot.mixed(corr = cor(videos[,c("views", "category_id","likes","dislikes","comment_count")]))
+
+ggplot(data=sum_videos, aes(category_name, group=1)) +
+  geom_line(aes(y=views), color="dark blue") + 
+  theme(axis.text.x = element_text(angle = 30, hjust = 1), 
+        plot.title = element_text(hjust = 0.5)) +
+  xlab('Youtube Video Category') +
+  ylab("Total Views") +
+  ggtitle("Total Views by Video Category")
+
+
+
+ggplot(data=sum_videos, aes(category_name, group=1)) +
+  geom_line(aes(y=likes, color="likes")) + 
+  geom_line(aes(y=comments, color="comments")) + 
+  geom_line(aes(y=dislikes, color="dislikes")) + 
+  scale_color_manual(values = c(
+    'likes' = 'steelblue', "comments" = "orange", "dislikes" = "purple")) +
+  labs(color = 'series') + 
+  theme(axis.text.x = element_text(angle = 30, hjust = 1), 
+        plot.title = element_text(hjust = 0.5)) +
+  xlab('Youtube Video Category') +
+  ylab("Counts") +
+  ggtitle("Total Likes, Dislikes & Comments by Video Category")
+
+
+ggplot(data=average_videos, aes(category_name, group=1)) +
+  geom_line(aes(y=likes, color="likes")) + 
+  geom_line(aes(y=comments, color="comments")) + 
+  geom_line(aes(y=dislikes, color="dislikes")) + 
+  scale_color_manual(values = c(
+    'likes' = 'steelblue', "comments" = "orange", "dislikes" = "purple")) +
+  labs(color = 'series') + 
+  theme(axis.text.x = element_text(angle = 30, hjust = 1), 
+        plot.title = element_text(hjust = 0.5)) +
+  xlab('Youtube Video Category') +
+  ylab("Counts") +
+  ggtitle("Average Likes, Dislikes & Comments by Video Category")
+
+
+likes_count = videos %>% 
+  arrange(desc(likes))
+likes_5000 = likes_count[1:5000,]
+plot_ly(likes_5000, labels = ~category_name, type = 'pie') %>%
+  layout(title = 'TOP 5000 Likes Youtube Videos',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+
+cmt_count = videos %>% 
+  arrange(desc(comment_count))
+cmt_5000 = cmt_count[1:5000,]
+plot_ly(cmt_5000, labels = ~category_name, type = 'pie') %>%
+  layout(title = 'TOP 5000 Comments Youtube Videos',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+```
+
