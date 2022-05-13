@@ -2,7 +2,10 @@
 title: "Final Project - Data Mining"
 author: "Yuxin_Feng, Liming Pang"
 date: "5/9/2022"
-output: pdf_document
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
 
 # How to be a successful Youtuber?
@@ -24,23 +27,23 @@ We would answer all of these questions in the following.
 <br>
 
 # Methods
-1.0 Data Cleaning
+## 1.0 Data Cleaning
 <br>
 We selected the data from March 1, 2018, to June 1, 2018 added counrty as a feature to the dataset.
 <br>
 <br>
-2.0 Regression Analysis
+## 2.0 Regression Analysis
 <br>
 Use variables to predict the views of Youtube Videos. This might help a potential youtuber have a rough idea what elements would influence the ultimate views of the videos. 
 We plan to use regression analysis to find out the whether variables like 'likes', 'dislikes', 'comment_ count', 'category_id', 'dif_date' and 'title_word' will have significant prediction effect on the outcome of views, and try to find the best linear regression model using the step-wise regression method.
 <br>
 <br>
-3.0 KNN & Decision Tress
+## 3.0 KNN & Decision Tress
 <br>
 Performed two models to find out the better one to help us make the decision.
 <br>
 <br>
-4.0 Data analysis
+## 4.0 Data analysis
 <br>
 This section mainly consists of three parts. 
 Firstly, we performed analysis on the general data, using plots to tell us the total/average views/likes/dislikes/comments based on different video categories, helping new youtubers to know more about the video market and the potential areas. 
@@ -69,7 +72,7 @@ library(plotly)
 ```
 
 # Result
-1.0 Data Cleaning
+## 1.0 Data Cleaning
 <br>
 The first thing we did is data cleaning. The data set we choose is very large. Although the values displayed are relatively complete, we found that in the data collected, the release time of the earliest video in different countries is different. This leads to an incomplete comparison. Therefore, under the condition that the data is absolutely sufficient, we intercepted the data from March 1, 2018, to June 1, 2018. At the same time, we coded each country and added them as a feature to the dataset to better explain the variability. Then we conducted data normalization using formula ((x - mean(x)) / Sd(x)).
 
@@ -141,9 +144,9 @@ title_words = videos$title_words
 ```
 
 <br>
-2.0 regression analysis
+## 2.0 regression analysis
 <br>
-2.0.1 Correlation
+### 2.0.1 Correlation
 <br>
 We all know that the ultimate goal of a new youtuber is to have the videos popular. That is to say, Views of Videos are the most thing that a youtuber care about. In order to give new youtubers a clearer idea of the relationship between each video features. We first conduct a correlation analysis. 
 We created a matrix that includes 'views’, ‘category_id’, ‘likes’, ‘dislikes’, ‘comment_count’, ‘title_words'. From the outcome, we know that views of videos has strong positive correlation with 'likes'(0.78) and 'dislikes'(0.74), and have a median-level positive correlation with 'comment_count'(0.54).
@@ -155,7 +158,7 @@ cor(Xmatrix)
 corrplot.mixed(corr = cor(videos[,c("views", "category_id","likes","dislikes","comment_count")]))
 ```
 
-2.0.2 pairs regression
+### 2.0.2 pairs regression
 <br>
 We use 'pairs' function to give us a rough idea of the relationships between each variables. The picture shows something obvious to us. For example, 'views' has positive correlation with 'likes', 'dislikes', and 'comment_counts'. 'dif_date' and 'title_words' seem not to be able to explain 'views' well.
 Also, in variables like 'views', 'like', 'dislike', 'comment_count', they seem to have strong correlation with each other from the picture shown to us.
@@ -170,7 +173,7 @@ reg0 = pairs(~views + category_id + likes + dislikes + comment_count + dif_days 
 ```
 
 
-2.0.3 linear regression
+### 2.0.3 linear regression
 <br>
 Based on the research above, we now know that the variables we choose are sure to explain some of the predictor - Video Views. Then we conducted the linear regression. We regress views on 6 variables (category_id, likes, dislikes, comment_count, dif_days,  title_words). We get an adjusted r-square of 0.757, meaning that the variales we choose to predict views might be a good fit. In addition, from the outcome of the regression, four of the six variables we choose have very significant parameter, which means that it makes sense to take them into consideration. The four significant variables are 'likes', 'dislikes', 'comment_count' and 'title_words'.
 
@@ -200,9 +203,9 @@ summary(reg_step1)
 ```
 
 <br>
-3.0 KNN & Decision Tress
+## 3.0 KNN & Decision Tress
 <br>
-3.0.1 KNN
+### 3.0.1 KNN
 <br>
 K-Nearest Neighbors algorithm (KNN) is one of the methods we chose. The immediate reason why we chose it is that it is a very simple, inert, nonparametric algorithm. KNN has relatively high accuracy, it does not need to be compared with better supervised learning models, and we do not need to make additional assumptions, adjust multiple parameters, or build models. However, it still has many disadvantages. For example, the accuracy of KNN fluctuates due to the quality of the data. Moreover, for big data, its prediction stage may be very slow. In addition, it will be sensitive to some irrelevant features, so we need to spend more energy on screening features. #### Result - Since the dependent variable is not discrete, we cannot use confusion matrix to show the accuracy of the model, so we calculate the RMSE, MSE and MAE of KNN. When K =5, KNN has the smallest predicted RMSE (0.1540642) (shown in appendix), meanwhile, MSE is 0.02373578 and MAE is 0.4635796.As shown in the figure, the coincidence degree between the real value and the predingvcf  fgcted value is relatively high. Combined with the RMSE shown earlier, this model performs well.
 <br>
@@ -228,7 +231,7 @@ legend("topright",  legend = c("original views of predict", "predicted"),
 grid()
 ```
 <br>
-3.0.2 Decision Tree
+### 3.0.2 Decision Tree
 <br>
 We also chose decision tree algorithm for comparison. A decision tree is a graphical way of representing choices and their consequences, and it is a very powerful supervised learning algorithm that can fit complex data sets and make very fast predictions and easily identify important variables and deal with missing data. Decision trees allow us to understand outcomes that convey explicit conditions based on the original variables. Because it doesn't require a lot of computation to process, we can easily program the model, which is a big part of why we chose it. After establishing the decision tree model, we use the cross validation to adjust the decision tree model, specify complexity parameters, adjust length and Gini index to split branches.
 <br>
@@ -291,9 +294,9 @@ In general, the performance of KNN is better than the decision tree. Although th
 <br>
 
 
-4.0 Data Visualization
+## 4.0 Data Visualization
 <br>
-4.0.1 Analysis on a general base
+### 4.0.1 Analysis on a general base
 <br>
 In the first part, we analyze on the general data, using all the video data we have to calculate the total and average value of each variable on the basis of category_id. With this method, we can have a better view of the performance of each type of videos.
 As there are four different pictures generated, I will select a typical one which shows us the average views of each category and put the left three pictures in the appendix section. 
@@ -398,7 +401,7 @@ ggplot(data=average_videos, aes(category_name, group=1)) +
 ```
 
 <br>
-4.0.2 Analysis on a Top5000 videos
+### 4.0.2 Analysis on a Top5000 videos
 <br>
 As we have a great number of observations collected, we decided to look more on more popular videos. Trying to figure out the common characteristics of them and make it easier for a new youtuber to get prepared.
 We rank the views of all the video data we get, and select the top5000-viewed videos(top5%).
@@ -456,7 +459,7 @@ plot_ly(dislikes_5000, labels = ~category_name, type = 'pie') %>%
 ```
 <br>
 
-4.0.3 Text Analysis
+### 4.0.3 Text Analysis
 <br>
 In the last part of our analysis, we decided to do some research on the popular videos' title. We want to find out what words appears most frequently.
 The result is shown below, among all the top5000 videos, 'officials' and 'trailer' are the words that appear most. New youtubers may even try to include these words in their videos in order to get more attention from people who are very allergic to some specific keywords.
